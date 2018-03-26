@@ -46,38 +46,37 @@ class Config:
 	def print_config(self):
 
 		print("Configuration")
-		print("-----------")
-		print("")
+		print("-------------")
 
-		print("buffers: ")
+		print("buffers:")
 
-		print('%15s' % ('eff addr:',)),
+		print('%12s' % ('eff addr:',)),
 		print(self.num_eff_addr)
 
-		print('%15s' % ('fp adds:',)),
+		print('%12s' % ('fp adds:',)),
 		print(self.num_fp_add)
 
-		print('%15s' % ('fp muls:',)),
+		print('%12s' % ('fp muls:',)),
 		print(self.num_fp_mul)
 
-		print('%15s' % ('ints:',)),
+		print('%12s' % ('ints:',)),
 		print(self.num_int)
 
-		print('%15s' % ('reorder:',)),
+		print('%12s' % ('reorder:',)),
 		print(self.num_reorder)
 
-		print("\nlatencies: ")
+		print("\nlatencies:")
 
-		print('%15s' % ('fp_add:',)),
+		print('%10s' % ('fp add:',)),
 		print(self.len_fp_add)
 
-		print('%15s' % ('fp_sub:',)),
+		print('%10s' % ('fp sub:',)),
 		print(self.len_fp_sub)
 
-		print('%15s' % ('fp_mul:',)),
+		print('%10s' % ('fp mul:',)),
 		print(self.len_fp_mul)
 
-		print('%15s' % ('fp_div:',)),
+		print('%10s' % ('fp div:',)),
 		print(self.len_fp_div)
 
 class Instructions:
@@ -266,8 +265,8 @@ class Stations:
 		for i in self.stations:
 			if i.dest != '':
 				if self.status.renames[int(i.dest)] == reg and x != num_reg:
-					print(i.dest),
-					print(self.status.renames[int(i.dest)])
+					#print(i.dest),
+					#print(self.status.renames[int(i.dest)])
 					return True
 
 			x+=1
@@ -360,7 +359,6 @@ class Stations:
 
 						if self.check_oj(rs,x):
 							i.qj = self.status.check_in(rs)
-							print(i.qj)
 
 						rt = ins.arg2
 
@@ -569,7 +567,7 @@ class Pipeline:
 		self.stations = stations
 		self.status = status
 
-		self.v = True
+		self.v = False
 
 		self.write_queue = list()
 
@@ -794,7 +792,7 @@ class Pipeline:
 			if len(stack) > 0:
 				i = stack[0]
 
-				print(i.text)
+				#print(i.text)
 			
 				# issue if available spots
 
@@ -847,7 +845,7 @@ class PipelineResults:
 		self.print_delays()
 
 	def setup_header(self):
-		print("                    Pipeline Simulation")
+		print("\n\n                    Pipeline Simulation")
 		print("-----------------------------------------------------------")
 		print("                                      Memory Writes")
 		print("     Instruction      Issues Executes  Read  Result Commits")
@@ -855,14 +853,32 @@ class PipelineResults:
 
 	def print_results(self):
 		for i in ins.data:
-			print("%-021s %6s %03s -%03s %06s %06s %06s" % 
-				(i.text, 
-					i.issues_at, 
-					i.start_executing, 
-					i.finish_executing,
-					i.memory_read, 
-					i.writes_result, 
-					i.commits))
+			if i.ins == "L.S" or i.ins == "LW":
+				print("%-021s %6s %03s -%03s %06s %06s %07s" % 
+					(i.text, 
+						i.issues_at, 
+						i.start_executing, 
+						i.finish_executing,
+						i.memory_read, 
+						i.writes_result, 
+						i.commits))
+			
+			elif i.ins == "S.S" or i.ins == "SW":
+					print("%-021s %6s %03s -%03s               %07s" % 
+					(i.text, 
+						i.issues_at, 
+						i.start_executing, 
+						i.finish_executing,
+						i.commits))
+			else:
+				print("%-021s %6s %03s -%03s        %06s %07s" % 
+					(i.text, 
+						i.issues_at, 
+						i.start_executing, 
+						i.finish_executing,
+						i.writes_result, 
+						i.commits))
+
 
 	def print_delays(self):
 		print("\n\nDelays")
@@ -871,7 +887,7 @@ class PipelineResults:
 		print(self.reo)
 		print("reservation station delays:"),
 		print(self.res)
-		print("data memory conflitcs delays:"),
+		print("data memory conflict delays:"),
 		print(self.data)
 		### TODO PROBABLY WHEN YOU CAN ONLY COMMIT ONE THING AT A TIME
 		print("true dependence delays:"),
@@ -880,7 +896,7 @@ class PipelineResults:
 
 if __name__ == "__main__":
 	
-	config = Config("trace.config")
+	config = Config("config.txt")
 
 	status = RegisterStatus()
 
