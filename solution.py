@@ -147,6 +147,17 @@ class DataTransfer:
 		self.cost = 1
 		self.text = text
 
+		self.issues_at = 0
+
+		self.start_executing = 0
+		self.end_executing = 0
+
+		self.writes_result = 0
+		self.commits = 0
+
+		self.memory_read = 0
+
+
 class Arithmetic:
 
 	def __init__(self, ins, dest, arg1, arg2, text):
@@ -174,8 +185,18 @@ class FloatingPoint:
 		self.dest = dest
 		self.arg1 = arg1
 		self.arg2 = arg2
-		self.cost = cost
+		self.cost = int(cost)
 		self.text = text
+
+		self.issues_at = 0
+
+		self.start_executing = 0
+		self.end_executing = 0
+
+		self.writes_result = 0
+		self.commits = 0
+
+		self.memory_read = 0
 
 class Station:
 	def __init__(self, name, t):
@@ -245,6 +266,8 @@ class Stations:
 		for i in self.stations:
 			if i.dest != '':
 				if self.status.renames[int(i.dest)] == reg and x != num_reg:
+					print(i.dest),
+					print(self.status.renames[int(i.dest)])
 					return True
 
 			x+=1
@@ -304,6 +327,124 @@ class Stations:
 
 
 						return True, x
+			elif ins.ins == "ADD.S" or ins.ins == "SUB.S":
+				if i.busy == "no":
+					if i.type == "fpadd":
+						# spot is found and its not busy
+						# add it in
+
+						# have to rename the registers
+
+						# check the registers if they are in the reservation
+						# station, if they are then we need to write to qj and qk
+
+						# set to busy
+
+						i.busy = "yes"
+
+						# add in op
+
+						i.op = ins.ins
+
+						# rename dest
+
+						dest = self.status.find_spot(ins.dest)
+
+						i.dest = dest
+
+						# go through the stations and see if any dependencies
+						# that need to be added to qj qk
+
+
+						rs = ins.arg1
+
+						if self.check_oj(rs,x):
+							i.qj = self.status.check_in(rs)
+							print(i.qj)
+
+						rt = ins.arg2
+
+						if self.check_oj(rt,x):
+							i.qk = self.status.check_in(rt)
+
+
+						return True, x
+
+			elif ins.ins == "MUL.S" or ins.ins == "DIV.S":
+				if i.busy == "no":
+					if i.type == "fpmul":
+						# spot is found and its not busy
+						# add it in
+
+						# have to rename the registers
+
+						# check the registers if they are in the reservation
+						# station, if they are then we need to write to qj and qk
+
+						# set to busy
+
+						i.busy = "yes"
+
+						# add in op
+
+						i.op = ins.ins
+
+						# rename dest
+
+						dest = self.status.find_spot(ins.dest)
+
+						i.dest = dest
+
+						# go through the stations and see if any dependencies
+						# that need to be added to qj qk
+
+
+						rs = ins.arg1
+
+						if self.check_oj(rs,x):
+							i.qj = self.status.check_in(rs)
+
+						rt = ins.arg2
+
+						if self.check_oj(rt,x):
+							i.qk = self.status.check_in(rt)
+
+
+						return True, x
+
+			elif ins.ins == "L.S" or ins.ins == "S.S":
+				if i.busy == "no":
+					if i.type == "effaddr":
+						# spot is found and its not busy
+						# add it in
+
+						# have to rename the registers
+
+						# check the registers if they are in the reservation
+						# station, if they are then we need to write to qj and qk
+
+						# set to busy
+
+						i.busy = "yes"
+
+						# add in op
+
+						i.op = ins.ins
+
+						# rename dest
+
+						dest = self.status.find_spot(ins.dest)
+
+						i.dest = dest
+
+						# go through the stations and see if any dependencies
+						# that need to be added to qj qk
+
+						if self.check_oj(i.dest,x):
+							i.qk = self.status.check_in(i.dest)
+
+
+						return True, x
 
 		return False, -1
 
@@ -342,6 +483,7 @@ class RegisterStatus:
 		for i in self.renames:
 			if i == reg:
 				return (x)
+			x+=1
 
 		return False
 
@@ -349,7 +491,7 @@ class RegisterStatus:
 		print("register status")
 		print("---------------")
 
-		x = 1
+		x = 0
 
 		for i in self.renames:
 			if i != - 1:
@@ -433,6 +575,10 @@ class Pipeline:
 
 		self.commit_queue = list()
 
+		self.reset_list = list()
+
+		self.read_queue = list()
+
 		self.cycle = 1
 
 		self.reservation_delays = 0
@@ -482,18 +628,41 @@ class Pipeline:
 				if i.cycles_left == 0:
 					i.status = "executed"
 
-					self.write_queue.append(i)
+					if i.obj.ins == "S.S" or i.obj.ins == "SW":
+						self.commit_queue.append(i)
+						#i.status = "committed"
+						# need to setup so that on next cycle after being
+						# executed it will reset the reservation station
+					elif i.obj.ins == "L.S" or i.obj.ins == "LW":
+						self.read_queue.append(i)
+					else:
+						self.write_queue.append(i)
+
+
 
 					i.obj.finish_executing = self.cycle
 
 					# this may not work correctly in some rare circumtances
 					# TODO: fix that possibly?
 
+	def read_stage(self):
+		if len(self.read_queue) > 0:
+			self.read_queue.sort(key= lambda x: x.obj.issues_at)
+			val = self.read_queue.pop(0)
+			val.status = "memread"
+			val.obj.memory_read = self.cycle
+
+			self.write_queue.append(val)
+
 	def write_stage(self):
 		if len(self.write_queue) > 0:
+			self.write_queue.sort(key= lambda x: x.obj.issues_at)
 			# get the destination register from the reservation station,
 			# go through the whole reservation station table and rest
 			# lines that have that in their qj and qk
+
+			# TODO: NEED TO ONLY ALLOW ONE THING TO WRITE AT A TIME
+			# AND IN ORDER
 
 			val = self.write_queue.pop(0)
 
@@ -501,34 +670,87 @@ class Pipeline:
 
 			val.obj.writes_result = self.cycle
 
+			dest = self.status.check_in(val.dest)
+
+			self.reset_list.append(dest)
+
+			#for i in self.stations.stations:
+			#		if i.qj == dest:
+			#			i.qj = ""
+			#		if i.qk == dest:
+			#			i.qk = ""
+
 			station = self.stations.stations[val.res]
 
 			station.reset()
 
 			self.commit_queue.append(val)
 
+	def commit_in_order(self, ins):
+		# checks if any ins earlier has not committed yet
+		# if it hasn't then wait
+		# go through buffer and see if this is the earliest issued
+		# if not then don't allow to commit
+
+		# essentially needs to check if it is earliest ins issued currently
+		# if not, then don't commit
+
+		ins_issued = ins.obj.issues_at
+
+		for i in self.buff.entries:
+			if i.busy == "yes":	
+				if i.obj.issues_at < ins.obj.issues_at:
+					# need earliest to be in the first spot so sort based on issue
+					# at time
+					return False
+
+		return True
+
 			
 
 	def commit_result(self):
 		if len(self.commit_queue) > 0:
+			self.commit_queue.sort(key= lambda x: x.obj.issues_at)
+			if self.commit_in_order(self.commit_queue[0]):
+				val = self.commit_queue.pop(0)
 
-			val = self.commit_queue.pop(0)
+				val.status = "committed"
 
-			val.status = "comitted"
+				val.busy = "no"
 
-			val.busy = "no"
 
-			dest = self.status.check_in(val.dest)
+				val.obj.commits = self.cycle
 
-			val.obj.commits = self.cycle
+				# moving removing of the destinations to the qj and qk to
+				# wroteresult
 
+				
+
+				self.status.remove_spot(val.dest)
+
+	def still_executing(self):
+		for i in self.buff.entries:
+			if i.status == "executing":
+				i.cycles_left -= 1
+
+	def resets_for_waiting(self):
+		for dest in self.reset_list:
 			for i in self.stations.stations:
-				if i.qj == dest:
-					i.qj = ""
-				if i.qk == dest:
-					i.qk = ""
+						if i.qj == dest:
+							i.qj = ""
+						if i.qk == dest:
+							i.qk = ""
 
-			self.status.remove_spot(val.dest)
+	def reset_res_store(self):
+		for i in self.buff.entries:
+			if i.busy == "yes":
+				if i.obj.ins == "S.S":
+					if i.status == "executed":
+						dest = self.status.check_in(i.dest)
+
+						station = self.stations.stations[i.res]
+
+						station.reset()	
 
 
 	def do_tomasulo(self):
@@ -542,6 +764,12 @@ class Pipeline:
 
 			first_ins = False
 
+			self.resets_for_waiting()
+
+			self.reset_res_store()
+
+			self.still_executing()
+
 			# commits result to the CDB
 
 			self.commit_result()
@@ -550,6 +778,8 @@ class Pipeline:
 			# start wrote_resuult stage start
 
 			self.write_stage()
+
+			self.read_stage()
 
 			# check issued if they can start executing
 			# if issued can start executing and it takes one cycle to execute
