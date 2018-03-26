@@ -410,7 +410,8 @@ class Stations:
 
 						return True, x
 
-			elif ins.ins == "L.S" or ins.ins == "S.S":
+			elif (ins.ins == "L.S" or ins.ins == "S.S" or 
+				ins.ins == "SW" or ins.ins == "LW"):
 				if i.busy == "no":
 					if i.type == "effaddr":
 						# spot is found and its not busy
@@ -626,6 +627,8 @@ class Pipeline:
 				if i.cycles_left == 0:
 					i.status = "executed"
 
+					i.obj.finish_executing = self.cycle
+
 					if i.obj.ins == "S.S" or i.obj.ins == "SW":
 						self.commit_queue.append(i)
 						#i.status = "committed"
@@ -638,7 +641,7 @@ class Pipeline:
 
 
 
-					i.obj.finish_executing = self.cycle
+					
 
 					# this may not work correctly in some rare circumtances
 					# TODO: fix that possibly?
@@ -742,7 +745,7 @@ class Pipeline:
 	def reset_res_store(self):
 		for i in self.buff.entries:
 			if i.busy == "yes":
-				if i.obj.ins == "S.S":
+				if i.obj.ins == "S.S" or i.obj.ins == "SW":
 					if i.status == "executed":
 						dest = self.status.check_in(i.dest)
 
