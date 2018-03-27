@@ -134,6 +134,14 @@ class Instructions:
 
 				self.data.append(Arithmetic(ins, args[0],
 					args[1], args[2], line.strip()))
+
+			elif (value[0] == "BEQ" or
+				value[0] == "BNE"):
+				ins = value[0]
+				args = value[1].split(",")
+
+				self.data.append(Arithmetic(ins, args[0],
+					args[1], args[2], line.strip()))
 			
 			#self.data.append(dum)
 
@@ -444,6 +452,49 @@ class Stations:
 
 
 						return True, x
+			elif ins.ins == "BEQ" or ins.ins == "BNE":
+				if i.busy == "no":
+					if i.type == "int":
+						# spot is found and its not busy
+						# add it in
+
+						# have to rename the registers
+
+						# check the registers if they are in the reservation
+						# station, if they are then we need to write to qj and qk
+
+						# set to busy
+
+						i.busy = "yes"
+
+						# add in op
+
+						i.op = ins.ins
+
+						# rename dest
+
+						#dest = self.status.find_spot(ins.arg2)
+
+						#i.dest = dest
+
+						# go through the stations and see if any dependencies
+						# that need to be added to qj qk
+
+
+						rs = ins.dest
+
+						if self.check_oj(rs,x):
+							i.qj = self.status.check_in(rs)
+
+						rt = ins.arg1
+
+						if self.check_oj(rt,x):
+							i.qk = self.status.check_in(rt)
+
+
+
+						return True, x			
+
 
 		return False, -1
 
@@ -485,6 +536,11 @@ class RegisterStatus:
 			x+=1
 
 		return False
+
+	def find_it(self, reg):
+
+		for i in self.renames:
+			print(i)
 
 	def print_status(self):
 		print("register status")
@@ -549,7 +605,8 @@ class ReorderBuffer:
 				i.busy = "yes"
 				i.ins = ins.text
 				i.status = "issued"
-				i.dest = ins.dest
+				if ins.ins != "BNE" and ins.ins != "BEQ":
+					i.dest = ins.dest
 				i.cycles_left = ins.cost
 				i.obj = ins
 				i.res = num
@@ -629,7 +686,8 @@ class Pipeline:
 
 					i.obj.finish_executing = self.cycle
 
-					if i.obj.ins == "S.S" or i.obj.ins == "SW":
+					if (i.obj.ins == "S.S" or i.obj.ins == "SW"
+						or i.obj.ins == "BEQ" or i.obj.ins == "BNE"):
 						self.commit_queue.append(i)
 						#i.status = "committed"
 						# need to setup so that on next cycle after being
@@ -639,9 +697,6 @@ class Pipeline:
 					else:
 						self.write_queue.append(i)
 
-
-
-					
 
 					# this may not work correctly in some rare circumtances
 					# TODO: fix that possibly?
@@ -674,12 +729,6 @@ class Pipeline:
 			dest = self.status.check_in(val.dest)
 
 			self.reset_list.append(dest)
-
-			#for i in self.stations.stations:
-			#		if i.qj == dest:
-			#			i.qj = ""
-			#		if i.qk == dest:
-			#			i.qk = ""
 
 			station = self.stations.stations[val.res]
 
@@ -719,13 +768,10 @@ class Pipeline:
 
 				val.busy = "no"
 
-
 				val.obj.commits = self.cycle
 
 				# moving removing of the destinations to the qj and qk to
 				# wroteresult
-
-				
 
 				self.status.remove_spot(val.dest)
 
@@ -745,7 +791,8 @@ class Pipeline:
 	def reset_res_store(self):
 		for i in self.buff.entries:
 			if i.busy == "yes":
-				if i.obj.ins == "S.S" or i.obj.ins == "SW":
+				if (i.obj.ins == "S.S" or i.obj.ins == "SW" or
+				i.obj.ins == "BEQ" or i.obj.ins == "BNE"):
 					if i.status == "executed":
 						dest = self.status.check_in(i.dest)
 
@@ -816,8 +863,6 @@ class Pipeline:
 				else:
 					self.reorder_delays += 1
 
-
-
 			if self.v:
 				print("\nCycle: " + str(self.cycle))
 				print("")
@@ -866,7 +911,8 @@ class PipelineResults:
 						i.writes_result, 
 						i.commits))
 			
-			elif i.ins == "S.S" or i.ins == "SW":
+			elif (i.ins == "S.S" or i.ins == "SW" 
+				or i.ins == "BNE" or i.ins == "BEQ"):
 					print("%-021s %6s %03s -%03s               %07s" % 
 					(i.text, 
 						i.issues_at, 
